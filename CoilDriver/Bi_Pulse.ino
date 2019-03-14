@@ -1,9 +1,12 @@
 // This sketch is for the "APEX Coil Driver 3", 4 wire chip (5v, GND, S1, & S2)
+// Interfaces via the "PWM to 2 Signal" board
 
 // Teensy PWM pin 17 can be used for 3.3 or 5 volt PWM on FTM1
 const char PWMPin = 22;
 const char EnPin = 21;
 const char TriggerPin = 2;
+const char CoilAEnable = 3; // Always a HIGH signal excpet during second frequency of BiFreq
+const char CoilBEnable = 4; // Always a LOW signal except during second frequency of BiFreq
 
 const double clockSpeed = 48000000; // Base clock frequency
 
@@ -56,6 +59,9 @@ String message = "";
 void setup() {
   pinMode(EnPin,OUTPUT);
   pinMode(PWMPin,OUTPUT);
+  pinMode(CoilAEnable,OUTPUT);
+  digitalWriteFast(CoilAEnable,HIGH);
+  pinMode(CoilBEnable,OUTPUT);
   pinMode(13,OUTPUT);
   pinMode(TriggerPin,INPUT_PULLUP);
   analogWriteResolution(10);  // analogWrite value 0 to 1023, or 1024 for high
@@ -75,6 +81,8 @@ void loop() {
     if (digitalReadFast(EnPin))  {
       if (doBifreq && !pulseDone) {
         digitalWriteFast(EnPin,LOW);
+        digitalWriteFast(CoilAEnable,LOW); // Sigal for coil A selection goes OFF
+        digitalWriteFast(CoilBEnable,HIGH); // Signal for coil B selection goes ON
         analogWriteFrequency(PWMPin, actualSecFreq);
         analogWrite(PWMPin, roundDuty);
         digitalWriteFast(EnPin,HIGH);
@@ -82,6 +90,8 @@ void loop() {
       }
       else  {
         digitalWriteFast(EnPin,LOW);
+        digitalWriteFast(CoilBEnable,LOW); // Signal for coil B selection goes OFF
+        digitalWriteFast(CoilAEnable,HIGH); // Signal for coil A selection goes ON
         if (totalPulses > 0)  {
           if (pulseCount++ >= totalPulses)  {
             Enable = false;
@@ -129,6 +139,8 @@ void loop() {
 
 inline void stopCmd() {
   digitalWriteFast(EnPin,LOW);
+  digitalWriteFast(CoilBEnable,LOW); // Signal for coil B selection goes OFF
+  digitalWriteFast(CoilAEnable,HIGH); // Signal for coil A selection goes ON
   Enable = false;
   pinMode(PWMPin,OUTPUT);
   digitalWriteFast(PWMPin,LOW);
@@ -141,6 +153,8 @@ inline void startCmd()  {
     lastPulse = loopMicros;
     pulseCount = 0;
     pulseMicros = pulseOnMicros;
+    digitalWriteFast(CoilBEnable,LOW); // Signal for coil B selection goes OFF
+    digitalWriteFast(CoilAEnable,HIGH); // Signal for coil A selection goes ON
     analogWriteFrequency(PWMPin, actualFreq);
     analogWrite(PWMPin, roundDuty);
     digitalWriteFast(EnPin,HIGH);
@@ -184,13 +198,13 @@ inline void parseMessage() {
     if (doBifreq) {
       doBifreq = false;
       pulseOnMicros *= 2ul;
-      pulseOffMicros = pulsePeriod - pulseOnMicros;
+      //pulseOffMicros = pulsePeriod - pulseOnMicros;
       Serial.println("Single frequency pulse mode");
     }
     else  {
       doBifreq = true;
       pulseOnMicros /= 2ul;
-      pulseOffMicros = pulsePeriod - pulseOnMicros;
+      //pulseOffMicros = pulsePeriod - pulseOnMicros;
       Serial.println("Bi-Frequency pulse mode");
     }
   }
